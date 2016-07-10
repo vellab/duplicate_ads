@@ -115,9 +115,62 @@ def get_features(train, test):
     output.remove('itemID_2')
     return output
 
-
+#Function to calculate hamming distance between strings
+def hammingDistance(s1, s2):
+    """Return the Hamming distance between equal-length sequences"""
+    if len(s1) != len(s2):
+        raise ValueError("Undefined for sequences of unequal length")
+    return sum(bool(ord(ch1) - ord(ch2)) for ch1, ch2 in zip(s1, s2))
+ 
+def combinehashes():
+    img0=pd.read_csv('image_hash_0.csv')
+    img1=pd.read_csv('image_hash_1.csv')
+    img2=pd.read_csv('image_hash_2.csv')
+    img3=pd.read_csv('image_hash_3.csv')
+    img4=pd.read_csv('image_hash_4.csv')
+    img5=pd.read_csv('image_hash_5.csv')
+    img6=pd.read_csv('image_hash_6.csv')
+    img7=pd.read_csv('image_hash_7.csv')
+    img8=pd.read_csv('image_hash_8.csv')
+    img9=pd.read_csv('image_hash_9.csv')
+    hashlist=[img0,img1,img2,img3,img4,img5,img6,img7,img8,img9]
+    global imagehash
+    imagehash=pd.concat(hashlist)
+   
+def gethash(img):
+    location=img[-2:]
+    if(location[0]=='0'):
+        arch='0'
+        folder=location[1]
+    else:
+        arch=location[0]
+        folder=location
+    prefix='Images_'+arch+'/'+folder+'/'+img
+    print(prefix)
+    temp=imagehash.loc[imagehash['image_id']==prefix,'image_hash']
+    temp=(temp.tolist())[0]
+    return temp
+    
+def getminhash(imgset1,imgset2):
+    minhash=300
+    if((imgset1!=-1) and (imgset2!=-1)):
+        print(imgset1)
+        imglist1=imgset1.split(',')
+        imglist2=imgset2.split(',')
+    
+        print(imglist1)
+        for img1 in imglist1:
+            for img2 in imglist2:
+                hash1=gethash(img1.strip())
+                hash2=gethash(img2.strip())
+                temp=hammingDistance(hash1,hash2)
+                if(temp<minhash):
+                    minhash=temp
+    return minhash
+                
 def prep_train():
     testing = 0
+    combinehashes()
     start_time = time.time()
 
     types1 = {
@@ -160,7 +213,7 @@ def prep_train():
 
     print('Merge item 1...')
     item1 = items[['itemID', 'categoryID', 'price', 'locationID', 'metroID', 'lat', 'lon', 
-    'len_title', 'len_description', 'len_attrsJSON']]
+    'len_title', 'len_description', 'len_attrsJSON','images_array']]
     item1 = pd.merge(item1, category, how='left', on='categoryID', left_index=True)
     item1 = pd.merge(item1, location, how='left', on='locationID', left_index=True)
 
@@ -178,6 +231,7 @@ def prep_train():
             'len_title': 'len_title_1',
 			'len_description': 'len_description_1',
 			'len_attrsJSON': 'len_attrsJSON_1',
+            'images_array':'images_1'
         }
     )
 
@@ -186,7 +240,7 @@ def prep_train():
 
     print('Merge item 2...')
     item2 = items[['itemID', 'categoryID', 'price', 'locationID', 'metroID', 'lat', 'lon', 
-    'len_title', 'len_description', 'len_attrsJSON']]
+    'len_title', 'len_description', 'len_attrsJSON','images_array']]
     item2 = pd.merge(item2, category, how='left', on='categoryID', left_index=True)
     item2 = pd.merge(item2, location, how='left', on='locationID', left_index=True)
 
@@ -203,7 +257,8 @@ def prep_train():
             'lon': 'lon_2',
             'len_title': 'len_title_2',
 			'len_description': 'len_description_2',
-			'len_attrsJSON': 'len_attrsJSON_2'
+			'len_attrsJSON': 'len_attrsJSON_2',
+             'images_array':'images_2'
         }
     )
 
@@ -219,6 +274,17 @@ def prep_train():
     train['metroID_same'] = np.equal(train['metroID_1'], train['metroID_2']).astype(np.int32)
     train['lat_same'] = np.equal(train['lat_1'], train['lat_2']).astype(np.int32)
     train['lon_same'] = np.equal(train['lon_1'], train['lon_2']).astype(np.int32)
+    
+    
+    
+    temphashlist=[]
+    print('Get minimum hash for train')
+    for index,row in train.iterrows():
+        temphashlist.append(getminhash(row['images_1'],row['images_2']))
+    train['minhash']=temphashlist
+    
+    train=train.drop(['images_1'])
+    train=train.drop(['images_2'])
 
     # print(train.describe())
     print('Create train data time: {} seconds'.format(round(time.time() - start_time, 2)))
@@ -265,7 +331,7 @@ def prep_test():
     
     print('Merge item 1...')
     item1 = items[['itemID', 'categoryID', 'price', 'locationID', 'metroID', 'lat', 'lon', 
-    'len_title', 'len_description', 'len_attrsJSON']]
+    'len_title', 'len_description', 'len_attrsJSON','images_array']]
     item1 = pd.merge(item1, category, how='left', on='categoryID', left_index=True)
     item1 = pd.merge(item1, location, how='left', on='locationID', left_index=True)
 
@@ -282,7 +348,8 @@ def prep_test():
             'lon': 'lon_1',
             'len_title': 'len_title_1',
 			'len_description': 'len_description_1',
-			'len_attrsJSON': 'len_attrsJSON_1'
+			'len_attrsJSON': 'len_attrsJSON_1',
+           'images_array':'images_1'
         }
     )
 
@@ -291,7 +358,7 @@ def prep_test():
 
     print('Merge item 2...')
     item2 = items[['itemID', 'categoryID', 'price', 'locationID', 'metroID', 'lat', 'lon',
-    'len_title', 'len_description', 'len_attrsJSON']]
+    'len_title', 'len_description', 'len_attrsJSON','images_array']]
     item2 = pd.merge(item2, category, how='left', on='categoryID', left_index=True)
     item2 = pd.merge(item2, location, how='left', on='locationID', left_index=True)
 
@@ -309,6 +376,7 @@ def prep_test():
             'len_title': 'len_title_2',
 			'len_description': 'len_description_2',
 			'len_attrsJSON': 'len_attrsJSON_2',
+               'images_array':'images_2'
         }
     )
 
@@ -324,6 +392,18 @@ def prep_test():
     train['metroID_same'] = np.equal(train['metroID_1'], train['metroID_2']).astype(np.int32)
     train['lat_same'] = np.equal(train['lat_1'], train['lat_2']).astype(np.int32)
     train['lon_same'] = np.equal(train['lon_1'], train['lon_2']).astype(np.int32)
+    
+        
+    
+    temphashlist=[]
+    print('Get minium hash for test')
+    for index,row in train.iterrows():
+        temphashlist.append(getminhash(row['images_1'],row['images_2']))
+    train['minhash']=temphashlist
+    
+    train=train.drop(['images_1'])
+    train=train.drop(['images_2'])
+
 
     # print(train.describe())
     print('Create test data time: {} seconds'.format(round(time.time() - start_time, 2)))
